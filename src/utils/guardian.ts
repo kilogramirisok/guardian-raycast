@@ -1,12 +1,12 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { getPreferenceValues } from "@raycast/api";
+import { getPreferenceValues, confirmAlert, Icon, showToast, Toast } from "@raycast/api";
 import { access, readFile, unlink } from "fs/promises";
 import { spawn } from "child_process";
 
 const execFileP = promisify(execFile);
 
-interface GuardianPreferences {
+export interface GuardianPreferences {
   guardianPath: string;
   defaultTimeout: string;
   defaultBlur: string;
@@ -33,12 +33,12 @@ export async function resolveBinary(): Promise<string | null> {
     }
   }
 
-  // 2. Brew default (Apple Silicon)
-  const brewPaths = [
-    "/opt/homebrew/bin/guardian",
+  // 2. Common install paths
+  const candidates = [
+    "/opt/homebrew/bin/guardian", // Apple Silicon
     "/usr/local/bin/guardian", // Intel Macs
   ];
-  for (const p of brewPaths) {
+  for (const p of candidates) {
     try {
       await access(p);
       return p;
@@ -47,23 +47,23 @@ export async function resolveBinary(): Promise<string | null> {
     }
   }
 
-  // 3. $PATH lookup via which
+  // 3. $PATH lookup
   try {
     const { stdout } = await execFileP("/usr/bin/which", ["guardian"]);
     const resolved = stdout.trim();
     if (resolved) {
-      try { await access(resolved); return resolved; } catch {}
+      try {
+        await access(resolved);
+        return resolved;
+      } catch {
+        // fall through
+      }
     }
-  } catch {}
+  } catch {
+    // fall through
+  }
 
   return null;
-}
-
-export function getBinaryPath(): string {
-  // Synchronous fallback — prefer resolveBinary() for real checks
-  const prefs = getPreferenceValues<GuardianPreferences>();
-  if (prefs.guardianPath) return prefs.guardianPath;
-  return "/opt/homebrew/bin/guardian";
 }
 
 export async function getGuardianStatus(): Promise<GuardianStatus> {
@@ -89,34 +89,45 @@ export async function getGuardianStatus(): Promise<GuardianStatus> {
   }
 }
 
-export async function installGuardian(): Promise<{ success: boolean; message: string }> {
-  // Check if brew is available first
+// Find the brew binary dynamically (Apple Silicon or Intel)
+async function findBrew(): Promise<string | null> {
+  const candidates = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"];
+  for (const p of candidates) {
+    try {
+      await access(p);
+      return p;
+    } catch {
+      continue;
+    }
+  }
   try {
-    await execFileP("/usr/bin/which", ["brew"]);
+    const { stdout } = await execFileP("/usr/bin/which", ["brew"]);
+    return stdout.trim() || null;
   } catch {
+    return null;
+  }
+}
+
+export async function installGuardian(): Promise<{ success: boolean; message: string }> {
+  const brew = await findBrew();
+  if (!brew) {
     return { success: false, message: "Homebrew not found. Install from brew.sh" };
   }
 
-  // Add the tap and install
+  // Add tap (may already exist)
   try {
-    await execFileP("/opt/homebrew/bin/brew", ["tap", "kilogramirisok/guardian"], { timeout: 30000 });
+    await execFileP(brew, ["tap", "kilogramirisok/guardian"], { timeout: 30_000 });
   } catch {
-    // tap may already exist, that's fine
+    // tap may already exist
   }
 
+  // Install
   try {
-    await execFileP("/opt/homebrew/bin/brew", ["install", "kilogramirisok/guardian/guardian"], { timeout: 120000 });
+    await execFileP(brew, ["install", "kilogramirisok/guardian/guardian"], { timeout: 120_000 });
     return { success: true, message: "Guardian installed via Homebrew" };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    // Try Intel path
-    try {
-      await execFileP("/usr/local/bin/brew", ["install", "kilogramirisok/guardian/guardian"], { timeout: 120000 });
-      return { success: true, message: "Guardian installed via Homebrew (Intel)" };
-    } catch (e2: unknown) {
-      const msg2 = e2 instanceof Error ? e2.message : String(e2);
-      return { success: false, message: `${msg}\n${msg2}` };
-    }
+    return { success: false, message: msg.slice(0, 200) };
   }
 }
 
@@ -129,4 +140,26 @@ export async function spawnDetached(args: string[]): Promise<void> {
     stdio: "ignore",
   });
   child.unref();
+}
+
+// Shared utility: ensure binary exists, prompt to install if missing.
+// Returns true if binary is ready, false if user cancelled or install failed.
+export async function ensureBinary(): Promise<boolean> {
+  const binaryPath = await resolveBinary();
+  if (binaryPath) return true;
+
+  const confirmed = await confirmAlert({
+    title: "Guardian CLI Not Found",
+    message: "Install it now via Homebrew?",
+    primaryButtonTitle: "Install",
+    icon: Icon.Download,
+  });
+  if (!confirmed) return false;
+
+  const toast = await showToast({ style: Toast.Style.Animated, title: "Installing Guardian..." });
+  const result = await installGuardian();
+  toast.style = result.success ? Toast.Style.Success : Toast.Style.Failure;
+  toast.title = result.success ? "Installed" : "Install Failed";
+  toast.message = result.message.slice(0, 80);
+  return result.success;
 }

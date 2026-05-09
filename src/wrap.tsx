@@ -5,15 +5,18 @@ import {
   showToast,
   Toast,
   Icon,
-  confirmAlert,
-  getPreferenceValues,
 } from "@raycast/api";
-import { getGuardianStatus, resolveBinary, installGuardian, spawnDetached } from "./utils/guardian";
+import { getGuardianStatus, ensureBinary, spawnDetached } from "./utils/guardian";
 import { useState } from "react";
 
-interface Prefs {
-  defaultBlur: string;
-}
+const BLUR_OPTIONS = [
+  { value: "0", title: "No blur" },
+  { value: "1", title: "Minimal" },
+  { value: "3", title: "Light" },
+  { value: "5", title: "Medium" },
+  { value: "7", title: "Heavy" },
+  { value: "10", title: "Maximum" },
+];
 
 export default function Command() {
   const [command, setCommand] = useState("");
@@ -21,34 +24,19 @@ export default function Command() {
 
   async function handleSubmit() {
     if (!command.trim()) {
-      await showToast({ style: Toast.Style.Failure, title: "No command provided" });
+      await showToast({ style: Toast.Style.Failure, title: "No Command Provided" });
       return;
     }
 
-    // Check binary exists
-    const binaryPath = await resolveBinary();
-    if (!binaryPath) {
-      const confirmed = await confirmAlert({
-        title: "Guardian CLI not found",
-        message: "Install it now via Homebrew?",
-        primaryButtonTitle: "Install",
-        icon: Icon.Download,
-      });
-      if (!confirmed) return;
-      const toast = await showToast({ style: Toast.Style.Animated, title: "Installing..." });
-      const result = await installGuardian();
-      toast.style = result.success ? Toast.Style.Success : Toast.Style.Failure;
-      toast.title = result.success ? "Installed!" : "Failed";
-      toast.message = result.message.slice(0, 80);
-      if (!result.success) return;
-    }
+    const ready = await ensureBinary();
+    if (!ready) return;
 
     // Check if already locked
     const status = await getGuardianStatus();
     if (status.running) {
       await showToast({
         style: Toast.Style.Failure,
-        title: "Already locked",
+        title: "Already Locked",
         message: `PID: ${status.pid}`,
       });
       return;
@@ -63,14 +51,14 @@ export default function Command() {
     if (newStatus.running) {
       await showToast({
         style: Toast.Style.Success,
-        title: "🚀 Running",
+        title: "Running",
         message: `${command} — ⌘⇧L to unlock`,
       });
     } else {
       await showToast({
         style: Toast.Style.Failure,
-        title: "Failed to launch",
-        message: "Check Accessibility permission",
+        title: "Failed to Launch",
+        message: "Grant Accessibility permission in System Settings",
       });
     }
   }
@@ -92,14 +80,17 @@ export default function Command() {
         info="The command to run while input is locked. Auto-unlocks when it exits."
       />
       <Form.Separator />
-      <Form.TextField
+      <Form.Dropdown
         id="blur"
         title="Blur Level"
-        placeholder="0"
         value={blur}
         onChange={setBlur}
-        info="Screen overlay blur (0-10). 0 = transparent."
-      />
+        info="Screen overlay blur intensity while locked"
+      >
+        {BLUR_OPTIONS.map((opt) => (
+          <Form.Dropdown.Item key={opt.value} value={opt.value} title={opt.title} />
+        ))}
+      </Form.Dropdown>
     </Form>
   );
 }

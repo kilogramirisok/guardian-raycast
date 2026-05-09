@@ -1,13 +1,7 @@
 import { MenuBarExtra, LaunchType, environment, Color, Icon, showToast, Toast } from "@raycast/api";
 import { usePromise } from "@raycast/utils";
-import { getGuardianStatus, installGuardian, spawnDetached } from "./utils/guardian";
+import { getGuardianStatus, installGuardian, spawnDetached, GuardianPreferences } from "./utils/guardian";
 import { getPreferenceValues } from "@raycast/api";
-
-interface GuardianPreferences {
-  guardianPath: string;
-  defaultTimeout: string;
-  defaultBlur: string;
-}
 
 export default function Command() {
   const { data: status, isLoading, revalidate } = usePromise(getGuardianStatus);
@@ -17,7 +11,6 @@ export default function Command() {
   const isRunning = status?.running ?? false;
   const isInstalled = status?.installed ?? false;
 
-  // Icon logic: not installed = warning, running = red lock, idle = green unlock
   const icon = !isInstalled
     ? { source: Icon.ExclamationMark, tintColor: Color.Yellow }
     : isRunning
@@ -30,12 +23,8 @@ export default function Command() {
       ? `Guardian locking input (PID: ${status?.pid})`
       : "Guardian ready";
 
-  // Hide menu bar in background when idle+installed (no noise)
-  if (isBackground && !isRunning && isInstalled) {
-    return null;
-  }
-  // Always show if not installed — user needs to see the warning
-  if (isBackground && isInstalled && !isRunning) {
+  // Hide menu bar in background when idle (no noise)
+  if (isBackground && !isRunning) {
     return null;
   }
 
@@ -47,7 +36,10 @@ export default function Command() {
         "--timeout", prefs.defaultTimeout,
         "--blur", blur ?? prefs.defaultBlur,
       ]);
-    } catch {}
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      await showToast({ style: Toast.Style.Failure, title: "Failed to lock", message: msg });
+    }
     setTimeout(() => revalidate(), 500);
   }
 
@@ -55,7 +47,10 @@ export default function Command() {
     if (!isInstalled) return;
     try {
       await spawnDetached(["wrap", "--blur", prefs.defaultBlur, "--", ...agent.split(" ")]);
-    } catch {}
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      await showToast({ style: Toast.Style.Failure, title: "Failed to wrap", message: msg });
+    }
     setTimeout(() => revalidate(), 500);
   }
 
@@ -63,16 +58,15 @@ export default function Command() {
     const toast = await showToast({ style: Toast.Style.Animated, title: "Installing Guardian..." });
     const result = await installGuardian();
     toast.style = result.success ? Toast.Style.Success : Toast.Style.Failure;
-    toast.title = result.success ? "Installed!" : "Failed";
+    toast.title = result.success ? "Installed" : "Install Failed";
     toast.message = result.message.slice(0, 80);
     revalidate();
   }
 
   return (
     <MenuBarExtra icon={icon} tooltip={tooltip} isLoading={isLoading}>
-      {/* NOT INSTALLED STATE */}
       {!isInstalled && (
-        <MenuBarExtra.Section title="⚠️ Not Installed">
+        <MenuBarExtra.Section title="Not Installed">
           <MenuBarExtra.Item
             title="Install via Homebrew"
             icon={Icon.Download}
@@ -85,10 +79,9 @@ export default function Command() {
         </MenuBarExtra.Section>
       )}
 
-      {/* INSTALLED — IDLE STATE */}
       {isInstalled && !isRunning && (
         <>
-          <MenuBarExtra.Section title="🔒 Lock">
+          <MenuBarExtra.Section title="Lock">
             <MenuBarExtra.Item
               title="Lock Input"
               icon={Icon.Lock}
@@ -101,14 +94,14 @@ export default function Command() {
             />
           </MenuBarExtra.Section>
 
-          <MenuBarExtra.Section title="🤖 Wrap Agent">
+          <MenuBarExtra.Section title="Wrap Agent">
             <MenuBarExtra.Item
               title="Claude Code"
               icon={Icon.Code}
               onAction={() => handleWrap("claude")}
             />
             <MenuBarExtra.Item
-              title="Claude Code (no perms)"
+              title="Claude Code (Skip Permissions)"
               icon={Icon.Code}
               onAction={() => handleWrap("claude --dangerously-skip-permissions")}
             />
@@ -126,9 +119,8 @@ export default function Command() {
         </>
       )}
 
-      {/* INSTALLED — RUNNING STATE */}
       {isInstalled && isRunning && (
-        <MenuBarExtra.Section title="🔒 Locked">
+        <MenuBarExtra.Section title="Locked">
           <MenuBarExtra.Item
             title={`PID: ${status?.pid}`}
             icon={Icon.Tag}

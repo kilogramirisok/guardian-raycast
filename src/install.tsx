@@ -1,7 +1,5 @@
-import { showToast, Toast, confirmAlert, Alert, Icon, Cache } from "@raycast/api";
+import { showToast, Toast, confirmAlert, Icon } from "@raycast/api";
 import { installGuardian, resolveBinary } from "./utils/guardian";
-
-const cache = new Cache();
 
 export default async function Command() {
   // Check if already installed
@@ -9,7 +7,7 @@ export default async function Command() {
   if (existing) {
     await showToast({
       style: Toast.Style.Success,
-      title: "Guardian is already installed",
+      title: "Guardian Is Already Installed",
       message: existing,
     });
     return;
@@ -18,7 +16,7 @@ export default async function Command() {
   // Confirm before installing
   const confirmed = await confirmAlert({
     title: "Install Guardian CLI",
-    message: "This will install guardian via Homebrew:\nbrew install kilogramirisok/guardian/guardian",
+    message: "This will install guardian via Homebrew",
     primaryButtonTitle: "Install",
     icon: Icon.Download,
   });
@@ -35,12 +33,11 @@ export default async function Command() {
 
   if (result.success) {
     toast.style = Toast.Style.Success;
-    toast.title = "Guardian installed!";
+    toast.title = "Guardian Installed";
     toast.message = "Grant Accessibility permission on first run";
-    cache.set("guardian-installed", "true");
   } else {
     toast.style = Toast.Style.Failure;
-    toast.title = "Installation failed";
+    toast.title = "Installation Failed";
     toast.message = result.message.slice(0, 100);
   }
 }

@@ -2,87 +2,38 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "guardian",
   "title": "Guardian",
-  "description": "Lock input, prevent sleep, keep agents running. Control the guardian macOS CLI from Raycast.",
-  "icon": "extension-icon.png",
+  "description": "Lock keyboard and mouse input to safely run AI agents unattended on macOS",
+  "icon": "command-icon.png",
   "author": "kilogramirisok",
+  "platforms": ["macOS"],
   "categories": ["System", "Developer Tools"],
   "license": "MIT",
   "commands": [
     {
       "name": "status",
       "title": "Guardian Status",
-      "description": "Show guardian lock status in menu bar",
+      "description": "Show lock status in the menu bar",
       "mode": "menu-bar",
       "interval": "5s"
     },
     {
       "name": "lock",
       "title": "Lock Input",
-      "description": "Lock all keyboard and mouse input",
+      "description": "Lock all keyboard and mouse input until unlocked",
       "mode": "no-view",
       "preferences": ["defaultTimeout", "defaultBlur"]
     },
     {
       "name": "wrap",
       "title": "Wrap Command",
-      "description": "Lock input and run a command",
+      "description": "Lock input and run a command, auto-unlock on exit",
       "mode": "view"
-    },
-    {
-      "name": "open-logs",
-      "title": "Open Guardian Logs",
-      "description": "View recent guardian output in terminal",
-      "mode": "no-view"
     },
     {
       "name": "install",
       "title": "Install Guardian CLI",
-      "description": "Install the guardian CLI via Homebrew (brew install kilogramirisok/guardian/guardian)",
+      "description": "Install the guardian CLI via Homebrew",
       "mode": "no-view"
-    }
-  ],
-  "preferences": [
-    {
-      "name": "guardianPath",
-      "type": "textfield",
-      "required": false,
-      "title": "Guardian Binary Path",
-      "description": "Path to guardian binary (default: auto-detect via which/brew)",
-      "default": "",
-      "placeholder": "/opt/homebrew/bin/guardian"
-    },
-    {
-      "name": "defaultTimeout",
-      "type": "dropdown",
-      "required": false,
-      "title": "Default Lock Timeout",
-      "description": "Auto-unlock timeout for guardian lock",
-      "default": "8h",
-      "data": [
-        { "value": "30m", "title": "30 minutes" },
-        { "value": "1h", "title": "1 hour" },
-        { "value": "2h", "title": "2 hours" },
-        { "value": "4h", "title": "4 hours" },
-        { "value": "8h", "title": "8 hours" },
-        { "value": "12h", "title": "12 hours" },
-        { "value": "24h", "title": "24 hours" }
-      ]
-    },
-    {
-      "name": "defaultBlur",
-      "type": "dropdown",
-      "required": false,
-      "title": "Default Blur Level",
-      "description": "Screen overlay blur when locked",
-      "default": "0",
-      "data": [
-        { "value": "0", "title": "No blur" },
-        { "value": "1", "title": "Minimal" },
-        { "value": "3", "title": "Light" },
-        { "value": "5", "title": "Medium" },
-        { "value": "7", "title": "Heavy" },
-        { "value": "10", "title": "Maximum" }
-      ]
     }
   ],
   "dependencies": {
@@ -102,7 +53,7 @@
     "dev": "ray develop",
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
-    "prepublishOnly": "echo \"\\n\\nIt seems like you are trying to publish the Raycast extension to the store. This is not allowed. Please use the 'npm run publish' command instead.\\n\\n\" && exit 1",
+    "prepublishOnly": "echo \"\\n\\nIt seems like you are trying to publish the Raycast extension to the npm registry. This is not allowed. Please use the 'npm run publish' command instead.\\n\\n\" && exit 1",
     "publish": "npx @raycast/api@latest publish"
   }
 }
