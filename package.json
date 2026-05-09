@@ -33,6 +33,12 @@
       "title": "Open Guardian Logs",
       "description": "View recent guardian output in terminal",
       "mode": "no-view"
+    },
+    {
+      "name": "install",
+      "title": "Install Guardian CLI",
+      "description": "Install the guardian CLI via Homebrew (brew install kilogramirisok/guardian/guardian)",
+      "mode": "no-view"
     }
   ],
   "preferences": [

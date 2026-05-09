@@ -5,10 +5,10 @@ import {
   showToast,
   Toast,
   Icon,
+  confirmAlert,
   getPreferenceValues,
 } from "@raycast/api";
-import { spawn } from "child_process";
-import { getBinaryPath, getGuardianStatus } from "./utils/guardian";
+import { getGuardianStatus, resolveBinary, installGuardian, spawnDetached } from "./utils/guardian";
 import { useState } from "react";
 
 interface Prefs {
@@ -25,28 +25,37 @@ export default function Command() {
       return;
     }
 
+    // Check binary exists
+    const binaryPath = await resolveBinary();
+    if (!binaryPath) {
+      const confirmed = await confirmAlert({
+        title: "Guardian CLI not found",
+        message: "Install it now via Homebrew?",
+        primaryButtonTitle: "Install",
+        icon: Icon.Download,
+      });
+      if (!confirmed) return;
+      const toast = await showToast({ style: Toast.Style.Animated, title: "Installing..." });
+      const result = await installGuardian();
+      toast.style = result.success ? Toast.Style.Success : Toast.Style.Failure;
+      toast.title = result.success ? "Installed!" : "Failed";
+      toast.message = result.message.slice(0, 80);
+      if (!result.success) return;
+    }
+
+    // Check if already locked
     const status = await getGuardianStatus();
     if (status.running) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Already locked",
-        message: `Guardian is running (PID: ${status.pid})`,
+        message: `PID: ${status.pid}`,
       });
       return;
     }
 
     const parts = command.trim().split(/\s+/);
-    const child = spawn(getBinaryPath(), [
-      "wrap",
-      "--blur", blur,
-      "--",
-      ...parts,
-    ], {
-      detached: true,
-      stdio: "ignore",
-    });
-
-    child.unref();
+    await spawnDetached(["wrap", "--blur", blur, "--", ...parts]);
 
     await new Promise((r) => setTimeout(r, 500));
 
@@ -61,7 +70,7 @@ export default function Command() {
       await showToast({
         style: Toast.Style.Failure,
         title: "Failed to launch",
-        message: "Check command and Accessibility permission",
+        message: "Check Accessibility permission",
       });
     }
   }
@@ -70,11 +79,7 @@ export default function Command() {
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm
-            title="Run Locked"
-            icon={Icon.Lock}
-            onSubmit={handleSubmit}
-          />
+          <Action.SubmitForm title="Run Locked" icon={Icon.Lock} onSubmit={handleSubmit} />
         </ActionPanel>
       }
     >
@@ -93,7 +98,7 @@ export default function Command() {
         placeholder="0"
         value={blur}
         onChange={setBlur}
-        info="Screen overlay blur (0-10). 0 = transparent overlay."
+        info="Screen overlay blur (0-10). 0 = transparent."
       />
     </Form>
   );
