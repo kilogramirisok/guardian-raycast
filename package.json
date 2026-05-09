@@ -40,6 +40,9 @@
     "@raycast/api": "^1.83.0",
     "@raycast/utils": "^1.17.0"
   },
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "devDependencies": {
     "@raycast/eslint-config": "^1.0.11",
     "@types/node": "22.5.4",
